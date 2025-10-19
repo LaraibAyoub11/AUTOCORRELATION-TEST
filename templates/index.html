@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Autocorrelation Analyzer | Statistical Test</title>
+
+<!-- Fonts & Icons -->
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<style>
+:root {
+  --primary: #6366f1;
+  --secondary: #10b981;
+  --danger: #ef4444;
+  --light: #f8fafc;
+  --dark: #1e293b;
+  --gray: #6b7280;
+  --card: rgba(255,255,255,0.9);
+  --shadow: 0 10px 25px -5px rgba(0,0,0,0.15);
+  --gradient: linear-gradient(135deg,#6366f1,#8b5cf6);
+  --gradient-dark: linear-gradient(135deg,#4f46e5,#7c3aed);
+}
+* {margin:0;padding:0;box-sizing:border-box;font-family:'Poppins',sans-serif;}
+body {
+  background: linear-gradient(135deg,#f0f4ff 0%,#fdf2f8 100%);
+  min-height: 100vh;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  padding:40px 20px;
+}
+.container {
+  width:min(100%,1000px);
+  background:var(--card);
+  border-radius:20px;
+  box-shadow:var(--shadow);
+  padding:32px;
+  backdrop-filter:blur(12px);
+  animation: fadeIn 1.2s ease;
+}
+@keyframes fadeIn {
+  from {opacity:0; transform:translateY(20px);}
+  to {opacity:1; transform:translateY(0);}
+}
+header {
+  text-align:center;
+  margin-bottom:32px;}
+header h1 {
+  font-size:2.4rem;
+  font-weight:700;
+  background:var(--gradient);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+header p {
+  color:var(--gray);
+  font-weight:500;
+}
+.input-card {
+  background:#fff;
+  border-radius:16px;
+  border:1px solid #e5e7eb;
+  padding:28px;
+  margin-bottom:24px;
+  box-shadow:var(--shadow);
+}
+h2.section-title {
+  font-size:1.25rem;
+  color:var(--dark);
+  margin-bottom:16px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+h2.section-title i {color:var(--primary);}
+label {
+  display:block;
+  font-weight:600;
+  margin-bottom:8px;
+  color:var(--dark);
+}
+textarea, input {
+  width:100%;
+  padding:12px 14px;
+  border:2px solid #e5e7eb;
+  border-radius:10px;
+  font-size:1rem;
+  transition:all 0.3s;
+}
+textarea:focus, input:focus {
+  border-color:var(--primary);
+  box-shadow:0 0 0 3px rgba(99,102,241,0.15);
+  outline:none;
+}
+textarea {
+  min-height:130px;
+  resize:vertical;
+}
+
+.grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:16px;
+  margin-top:18px;
+}
+
+button.btn {
+  width:100%;
+  padding:16px;
+  margin-top:18px;
+  background:var(--gradient);
+  color:#fff;
+  border:none;
+  border-radius:12px;
+  font-weight:600;
+  font-size:1.1rem;
+  cursor:pointer;
+  transition:all 0.3s;
+  box-shadow:0 5px 15px rgba(99,102,241,0.3);
+}
+button.btn:hover {
+  background:var(--gradient-dark);
+  transform:translateY(-2px);
+}
+
+.loading {
+  text-align:center;
+  display:none;
+  padding:30px;
+}
+.spinner {
+  width:45px;height:45px;
+  border:5px solid rgba(99,102,241,0.2);
+  border-left-color:var(--primary);
+  border-radius:50%;
+  margin:auto;
+  animation:spin 1s linear infinite;
+}
+@keyframes spin {to{transform:rotate(360deg);}}
+
+.result {
+  display:none;
+  background:#fff;
+  border-radius:16px;
+  padding:24px;
+  border:1px solid #e5e7eb;
+  box-shadow:var(--shadow);
+}
+
+.status {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  padding:16px;
+  border-radius:12px;
+  font-weight:600;
+  margin-bottom:20px;
+}
+.ok {background:#dcfce7;color:#065f46;border:1px solid #10b981;}
+.bad {background:#fee2e2;color:#991b1b;border:1px solid #ef4444;}
+
+.results-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
+  gap:20px;
+}
+
+.card {
+  background:#fff;
+  border:1px solid #e5e7eb;
+  border-radius:14px;
+  padding:18px;
+  box-shadow:var(--shadow);
+}
+.card h3 {
+  font-size:1.1rem;
+  margin-bottom:12px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  color:var(--dark);
+}
+.card h3 i {color:var(--primary);}
+.metric {display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f1f5f9;}
+.metric:last-child{border-bottom:none;}
+.metric-name {color:var(--gray);}
+.metric-value {font-weight:600;}
+
+.table-container {
+  margin-top:12px;
+  max-height:250px;
+  overflow:auto;
+  border:1px solid #e5e7eb;
+  border-radius:10px;
+}
+table {
+  width:100%;
+  border-collapse:collapse;
+}
+th,td {
+  padding:8px 12px;
+  border-bottom:1px solid #f1f5f9;
+  text-align:left;
+}
+th {background:#f8fafc;position:sticky;top:0;}
+
+.code {
+  background:#1e293b;
+  color:#f8fafc;
+  font-family:'Courier New',monospace;
+  padding:10px 14px;
+  border-radius:8px;
+  font-size:0.9rem;
+  margin:10px 0;
+}
+.highlight {color:var(--primary);font-weight:700;}
+</style>
+</head>
+
+<body>
+<div class="container">
+  <header>
+    <h1><i class="fas fa-chart-line"></i> Autocorrelation Analyzer</h1>
+    <p>Interactive step-by-step test for sequence randomness</p>
+  </header>
+
+  <div class="input-card">
+    <h2 class="section-title"><i class="fas fa-sliders-h"></i> Test Configuration</h2>
+    <label>Random Number Sequence</label>
+    <textarea id="sequence" placeholder="Paste your numbers separated by commas or spaces...">0.63,0.28,0.30,0.42,0.97,0.05,0.71,0.63,0.17,0.86,0.61,0.19,0.94,0.64,0.84,0.54,0.56,0.57,0.09,0.99,0.01,0.10,0.69,0.38,0.93,0.85,0.68,0.14,0.18,0.84,0.19,0.71,0.44,0.72,0.95,0.28,0.96,0.51,0.50,0.89,0.66,0.31,0.50,0.33,0.89,0.54,0.73,0.76,0.62,0.92</textarea>
+
+    <div class="grid">
+      <div>
+        <label>Significance Level (α)</label>
+        <input id="alpha" type="number" step="0.0001" min="0.001" max="0.5" value="0.05">
+      </div>
+      <div>
+        <label>Start Index (i)</label>
+        <input id="i" type="number" step="1" min="1" value="5">
+      </div>
+      <div>
+        <label>Lag (m)</label>
+        <input id="m" type="number" step="1" min="1" value="5">
+      </div>
+    </div>
+
+    <button class="btn" id="run"><i class="fas fa-play-circle"></i> Run Test</button>
+  </div>
+
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <p>Processing your data...</p>
+  </div>
+
+  <div class="result" id="output"></div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+
+function parseSeq(text){
+  return text.replace(/[\n\r\t,;]+/g,' ')
+             .trim()
+             .split(/\s+/)
+             .filter(Boolean)
+             .map(Number)
+             .filter(x => Number.isFinite(x));
+}
+
+$("#run").addEventListener("click", async () => {
+  const seq = parseSeq($("#sequence").value);
+  const alpha = parseFloat($("#alpha").value);
+  const i = parseInt($("#i").value,10);
+  const m = parseInt($("#m").value,10);
+  const out = $("#output");
+  const load = $("#loading");
+
+  if(!seq.length){
+    out.style.display='block';
+    out.innerHTML='<div class="status bad"><i class="fas fa-exclamation-circle"></i> Please enter valid numbers.</div>';
+    return;
+  }
+
+  out.style.display='none';
+  load.style.display='block';
+
+  try {
+    const res = await fetch('/autocorrelation',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({sequence:seq,alpha,i,m})
+    });
+    const data = await res.json();
+    load.style.display='none';
+    if(!res.ok) throw new Error(data.error||'Server error');
+
+    const status = data.independent
+      ? `<div class="status ok"><i class="fas fa-check-circle"></i> ✅ Independent — Do NOT Reject H₀</div>`
+      : `<div class="status bad"><i class="fas fa-exclamation-triangle"></i> ❌ Dependent — Reject H₀</div>`;
+
+    const rows = data.rows.map(r=>`
+      <tr>
+        <td>${r.k}</td><td>${r.a}</td><td>${r.b}</td>
+        <td>${r.Ra.toFixed(4)}</td><td>${r.Rb.toFixed(4)}</td><td>${r.prod.toFixed(4)}</td>
+      </tr>`).join('');
+
+    out.innerHTML = `
+      ${status}
+      <div class="results-grid">
+        <div class="card">
+          <h3><i class="fas fa-info-circle"></i> Summary</h3>
+          <div class="metric"><span class="metric-name">N</span><span class="metric-value">${data.N}</span></div>
+          <div class="metric"><span class="metric-name">i</span><span class="metric-value">${data.i}</span></div>
+          <div class="metric"><span class="metric-name">m</span><span class="metric-value">${data.m}</span></div>
+          <div class="metric"><span class="metric-name">M</span><span class="metric-value">${data.M}</span></div>
+          <div class="metric"><span class="metric-name">ρ̂</span><span class="metric-value">${data.rho_hat.toFixed(6)}</span></div>
+          <div class="metric"><span class="metric-name">σ(ρ̂)</span><span class="metric-value">${data.sd.toFixed(6)}</span></div>
+          <div class="metric"><span class="metric-name">Z₀</span><span class="metric-value">${data.Z0.toFixed(6)}</span></div>
+          <div class="metric"><span class="metric-name">Z₍crit₎</span><span class="metric-value">${data.Zcrit.toFixed(4)}</span></div>
+          <div class="metric"><span class="metric-name">Decision</span><span class="metric-value highlight">${data.decision}</span></div>
+        </div>
+
+        <div class="card">
+          <h3><i class="fas fa-table"></i> Data Table</h3>
+          <div class="table-container">
+            <table>
+              <thead><tr><th>k</th><th>a=i+km</th><th>b=i+(k+1)m</th><th>R[a]</th><th>R[b]</th><th>Product</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:18px">
+        <h3><i class="fas fa-list-ol"></i> Step-by-Step Calculations</h3>
+        <div class="code">${data.eq.m_eq}</div>
+        <div class="code">${data.eq.rho_eq}</div>
+        <div class="code">${data.eq.sd_eq}</div>
+        <div class="code">${data.eq.z_eq}</div>
+        <div class="code">${data.eq.crit_eq}</div>
+        <div class="code">${data.eq.final_eq}</div>
+        <div class="row" style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+          <img src="data:image/png;base64,${data.graphs.sequence}" style="width:46%;border-radius:10px;border:1px solid #e5e7eb;">
+          <img src="data:image/png;base64,${data.graphs.scatter}" style="width:46%;border-radius:10px;border:1px solid #e5e7eb;">
+        </div>
+      </div>
+    `;
+    out.style.display='block';
+  } catch(err){
+    load.style.display='none';
+    out.style.display='block';
+    out.innerHTML=`<div class="status bad"><i class="fas fa-bug"></i> Error: ${err.message}</div>`;
+  }
+});
+</script>
+</body>
+</html>
