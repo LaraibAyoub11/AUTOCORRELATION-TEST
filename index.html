@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Autocorrelation Analyzer | Auto Mode</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+:root {
+  --primary: #6366f1;
+  --secondary: #10b981;
+  --danger: #ef4444;
+  --light: #f8fafc;
+  --dark: #1e293b;
+  --gray: #6b7280;
+  --card: rgba(255,255,255,0.9);
+  --shadow: 0 10px 25px -5px rgba(0,0,0,0.15);
+  --gradient: linear-gradient(135deg,#6366f1,#8b5cf6);
+  --gradient-dark: linear-gradient(135deg,#4f46e5,#7c3aed);
+}
+* {margin:0;padding:0;box-sizing:border-box;font-family:'Poppins',sans-serif;}
+body {
+  background: linear-gradient(135deg,#f0f4ff 0%,#fdf2f8 100%);
+  min-height: 100vh;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  padding:40px 20px;
+}
+.container {
+  width:min(100%,1100px);
+  background:var(--card);
+  border-radius:20px;
+  box-shadow:var(--shadow);
+  padding:32px;
+  backdrop-filter:blur(12px);
+}
+header { text-align:center; margin-bottom:24px; }
+header h1 {
+  font-size:2.2rem; font-weight:700;
+  background:var(--gradient);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+header p { color:var(--gray); }
+.controls { display:flex; gap:12px; justify-content:center; margin-bottom:16px; }
+button.btn { padding:12px 18px; background:var(--gradient); color:#fff; border:none; border-radius:10px; font-weight:600; cursor:pointer; transition:.25s; box-shadow:0 5px 15px rgba(99,102,241,0.3); }
+button.btn:hover { background:var(--gradient-dark); transform:translateY(-1px); }
+.loading { text-align:center; display:none; padding:18px; }
+.spinner { width:42px;height:42px;border:5px solid rgba(99,102,241,0.2); border-left-color:var(--primary);border-radius:50%;margin:auto;animation:spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.result { display:none; background:#fff;border-radius:16px;padding:22px;border:1px solid #e5e7eb;box-shadow:var(--shadow); }
+.status { display:flex;align-items:center;justify-content:center;gap:10px;padding:14px;border-radius:12px;font-weight:600;margin-bottom:16px; }
+.ok {background:#dcfce7;color:#065f46;border:1px solid #10b981;}
+.bad {background:#fee2e2;color:#991b1b;border:1px solid #ef4444;}
+.grid { display:grid; gap:18px; grid-template-columns: 1fr 1.1fr; }
+.card { background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:16px; box-shadow:var(--shadow); }
+.card h3 { font-size:1.05rem;margin-bottom:10px;display:flex;align-items:center;gap:8px;color:var(--dark); }
+.card h3 i { color:var(--primary); }
+.table-container { max-height:300px; overflow:auto; border:1px solid #e5e7eb; border-radius:10px; }
+table { width:100%; border-collapse:collapse; font-size:0.92rem; }
+th,td { padding:8px 10px; border-bottom:1px solid #f1f5f9; text-align:left; }
+th { background:#f8fafc; position:sticky; top:0; }
+.code { background:#0f172a; color:#f8fafc; font-family:'Courier New',monospace; padding:10px 12px; border-radius:8px; font-size:0.9rem; margin:8px 0; }
+.seq-box { background:#f8fafc; border:1px dashed #cbd5e1; padding:10px; border-radius:10px; font-family:monospace; font-size:0.9rem; line-height:1.5; }
+img.graph { width:48%; border-radius:10px; border:1px solid #e5e7eb; }
+.graph-row { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin-top:8px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1><i class="fas fa-chart-line"></i> Autocorrelation Analyzer</h1>
+    <p>System generates random digits → full step-by-step calculations shown.</p>
+  </header>
+  <div class="controls">
+    <button class="btn" id="run"><i class="fas fa-dice"></i> Generate New Sequence & Run</button>
+  </div>
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <p>Generating random numbers and computing…</p>
+  </div>
+  <div class="result" id="output"></div>
+</div>
+<script>
+const $ = s => document.querySelector(s);
+function prettyList(nums) {
+  if (!nums || !nums.length) return ''; return nums.map((x,idx)=> ((idx+1).toString().padStart(2,'0') + ': ' + x.toFixed(2))).join(', ');
+}
+$("#run").addEventListener("click", async () => {
+  const out = $("#output"); const load = $("#loading"); out.style.display='none'; load.style.display='block';
+  try {
+    const res = await fetch('/autocorrelation', { method:'POST' });
+    const data = await res.json(); load.style.display='none'; if(!res.ok) throw new Error(data.error||'Server error');
+    const status = data.independent ? `<div class="status ok"><i class="fas fa-check-circle"></i> ✅ Independent — Do NOT Reject H₀</div>` : `<div class="status bad"><i class="fas fa-exclamation-triangle"></i> ❌ Dependent — Reject H₀</div>`;
+    const rows = (data.rows || []).map(r=>`<tr><td>${r.k}</td><td>${r.a}</td><td>${r.b}</td><td>${Number(r.Ra).toFixed(4)}</td><td>${Number(r.Rb).toFixed(4)}</td><td>${Number(r.prod).toFixed(4)}</td></tr>`).join('');
+    out.innerHTML = `${status}<div class="grid"><div class="card"><h3><i class="fas fa-list"></i> Generated Random Digits (N = ${data.N})</h3><div class="seq-box">${(data.sequence||[]).map(v=>Number(v).toFixed(2)).join(', ')}</div><div style="margin-top:8px;color:#64748b;font-size:.9rem;"><b>Parameters used:</b> α = ${data.alpha}, i = ${data.i}, m = ${data.m}, M = ${data.M}</div><h3 style="margin-top:14px;"><i class="fas fa-equals"></i> Step-by-Step</h3><div class="code">${data.eq.m_eq}</div><div class="code">${data.eq.rho_eq}</div><div class="code">${data.eq.sd_eq}</div><div class="code">${data.eq.z_eq}</div><div class="code">${data.eq.crit_eq}</div><div class="code">${data.eq.final_eq}</div></div><div class="card"><h3><i class="fas fa-table"></i> Data Table (Pairs & Products)</h3><div class="table-container"><table><thead><tr><th>k</th><th>a=i+km</th><th>b=i+(k+1)m</th><th>R[a]</th><th>R[b]</th><th>Product</th></tr></thead><tbody>${rows}</tbody></table></div><h3 style="margin-top:14px;"><i class="fas fa-info-circle"></i> Summary Metrics</h3><table><tr><td><b>ρ̂</b></td><td>${Number(data.rho_hat).toFixed(6)}</td></tr><tr><td><b>σ(ρ̂)</b></td><td>${Number(data.sd).toFixed(6)}</td></tr><tr><td><b>Z₀</b></td><td>${Number(data.Z0).toFixed(6)}</td></tr><tr><td><b>Z₍crit₎</b></td><td>${Number(data.Zcrit).toFixed(4)}</td></tr><tr><td><b>Decision</b></td><td><b>${data.decision}</b></td></tr></table></div></div><div class="card" style="margin-top:16px;"><h3><i class="fas fa-chart-area"></i> Visualizations</h3><div class="graph-row"><img class="graph" src="data:image/png;base64,${data.graphs.sequence}" alt="Sequence Graph"><img class="graph" src="data:image/png;base64,${data.graphs.scatter}" alt="Scatter Graph"></div></div>`; out.style.display='block';
+  } catch(err){ load.style.display='none'; out.style.display='block'; out.innerHTML=`<div class="status bad"><i class="fas fa-bug"></i> Error: ${err.message}</div>`; }
+});
+window.addEventListener('DOMContentLoaded', () => { $("#run").click(); });
+</script>
+</body>
+</html>
+
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Autocorrelation Analyzer | Auto Mode</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<style>
+:root {
+  --primary: #6366f1;
+  --secondary: #10b981;
+  --danger: #ef4444;
+  --light: #f8fafc;
+  --dark: #1e293b;
+  --gray: #6b7280;
+  --card: rgba(255,255,255,0.9);
+  --shadow: 0 10px 25px -5px rgba(0,0,0,0.15);
+  --gradient: linear-gradient(135deg,#6366f1,#8b5cf6);
+  --gradient-dark: linear-gradient(135deg,#4f46e5,#7c3aed);
+}
+* {margin:0;padding:0;box-sizing:border-box;font-family:'Poppins',sans-serif;}
+body {
+  background: linear-gradient(135deg,#f0f4ff 0%,#fdf2f8 100%);
+  min-height: 100vh;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  padding:40px 20px;
+}
+.container {
+  width:min(100%,1100px);
+  background:var(--card);
+  border-radius:20px;
+  box-shadow:var(--shadow);
+  padding:32px;
+  backdrop-filter:blur(12px);
+}
+header { text-align:center; margin-bottom:24px; }
+header h1 {
+  font-size:2.2rem; font-weight:700;
+  background:var(--gradient);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+header p { color:var(--gray); }
+
+.controls {
+  display:flex; gap:12px; justify-content:center; margin-bottom:16px;
+}
+button.btn {
+  padding:12px 18px;
+  background:var(--gradient);
+  color:#fff; border:none; border-radius:10px;
+  font-weight:600; cursor:pointer; transition:.25s;
+  box-shadow:0 5px 15px rgba(99,102,241,0.3);
+}
+button.btn:hover { background:var(--gradient-dark); transform:translateY(-1px); }
+
+.loading { text-align:center; display:none; padding:18px; }
+.spinner {
+  width:42px;height:42px;border:5px solid rgba(99,102,241,0.2);
+  border-left-color:var(--primary);border-radius:50%;margin:auto;animation:spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.result {
+  display:none;
+  background:#fff;border-radius:16px;padding:22px;border:1px solid #e5e7eb;box-shadow:var(--shadow);
+}
+.status {
+  display:flex;align-items:center;justify-content:center;gap:10px;padding:14px;border-radius:12px;font-weight:600;margin-bottom:16px;
+}
+.ok {background:#dcfce7;color:#065f46;border:1px solid #10b981;}
+.bad {background:#fee2e2;color:#991b1b;border:1px solid #ef4444;}
+
+.grid {
+  display:grid; gap:18px; grid-template-columns: 1fr 1.1fr;
+}
+.card { background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:16px; box-shadow:var(--shadow); }
+.card h3 { font-size:1.05rem;margin-bottom:10px;display:flex;align-items:center;gap:8px;color:var(--dark); }
+.card h3 i { color:var(--primary); }
+
+.table-container { max-height:300px; overflow:auto; border:1px solid #e5e7eb; border-radius:10px; }
+table { width:100%; border-collapse:collapse; font-size:0.92rem; }
+th,td { padding:8px 10px; border-bottom:1px solid #f1f5f9; text-align:left; }
+th { background:#f8fafc; position:sticky; top:0; }
+
+.code {
+  background:#0f172a; color:#f8fafc; font-family:'Courier New',monospace;
+  padding:10px 12px; border-radius:8px; font-size:0.9rem; margin:8px 0;
+}
+.seq-box {
+  background:#f8fafc; border:1px dashed #cbd5e1; padding:10px; border-radius:10px; font-family:monospace;
+  font-size:0.9rem; line-height:1.5;
+}
+img.graph { width:48%; border-radius:10px; border:1px solid #e5e7eb; }
+.graph-row { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin-top:8px; }
+</style>
+</head>
+
+<body>
+<div class="container">
+  <header>
+    <h1><i class="fas fa-chart-line"></i> Autocorrelation Analyzer</h1>
+    <p>System generates random digits → full step-by-step calculations shown.</p>
+  </header>
+
+  <div class="controls">
+    <button class="btn" id="run"><i class="fas fa-dice"></i> Generate New Sequence & Run</button>
+  </div>
+
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <p>Generating random numbers and computing…</p>
+  </div>
+
+  <div class="result" id="output"></div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+
+function prettyList(nums) {
+  if (!nums || !nums.length) return '';
+  return nums.map((x,idx)=> ((idx+1).toString().padStart(2,'0') + ': ' + x.toFixed(2))).join(', ');
+}
+
+$("#run").addEventListener("click", async () => {
+  const out = $("#output");
+  const load = $("#loading");
+  out.style.display='none';
+  load.style.display='block';
+
+  try {
+    const res = await fetch('/autocorrelation', { method:'POST' });
+    const data = await res.json();
+    load.style.display='none';
+    if(!res.ok) throw new Error(data.error||'Server error');
+
+    const status = data.independent
+      ? `<div class="status ok"><i class="fas fa-check-circle"></i> ✅ Independent — Do NOT Reject H₀</div>`
+      : `<div class="status bad"><i class="fas fa-exclamation-triangle"></i> ❌ Dependent — Reject H₀</div>`;
+
+    const rows = (data.rows || []).map(r=>`
+      <tr>
+        <td>${r.k}</td><td>${r.a}</td><td>${r.b}</td>
+        <td>${Number(r.Ra).toFixed(4)}</td><td>${Number(r.Rb).toFixed(4)}</td><td>${Number(r.prod).toFixed(4)}</td>
+      </tr>`).join('');
+
+    out.innerHTML = `
+      ${status}
+
+      <div class="grid">
+        <div class="card">
+          <h3><i class="fas fa-list"></i> Generated Random Digits (N = ${data.N})</h3>
+          <div class="seq-box">${(data.sequence||[]).map(v=>Number(v).toFixed(2)).join(', ')}</div>
+          <div style="margin-top:8px;color:#64748b;font-size:.9rem;">
+            <b>Parameters used:</b> α = ${data.alpha}, i = ${data.i}, m = ${data.m}, M = ${data.M}
+          </div>
+
+          <h3 style="margin-top:14px;"><i class="fas fa-equals"></i> Step-by-Step</h3>
+          <div class="code">${data.eq.m_eq}</div>
+          <div class="code">${data.eq.rho_eq}</div>
+          <div class="code">${data.eq.sd_eq}</div>
+          <div class="code">${data.eq.z_eq}</div>
+          <div class="code">${data.eq.crit_eq}</div>
+          <div class="code">${data.eq.final_eq}</div>
+        </div>
+
+        <div class="card">
+          <h3><i class="fas fa-table"></i> Data Table (Pairs & Products)</h3>
+          <div class="table-container">
+            <table>
+              <thead><tr><th>k</th><th>a=i+km</th><th>b=i+(k+1)m</th><th>R[a]</th><th>R[b]</th><th>Product</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+
+          <h3 style="margin-top:14px;"><i class="fas fa-info-circle"></i> Summary Metrics</h3>
+          <table>
+            <tr><td><b>ρ̂</b></td><td>${Number(data.rho_hat).toFixed(6)}</td></tr>
+            <tr><td><b>σ(ρ̂)</b></td><td>${Number(data.sd).toFixed(6)}</td></tr>
+            <tr><td><b>Z₀</b></td><td>${Number(data.Z0).toFixed(6)}</td></tr>
+            <tr><td><b>Z₍crit₎</b></td><td>${Number(data.Zcrit).toFixed(4)}</td></tr>
+            <tr><td><b>Decision</b></td><td><b>${data.decision}</b></td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <h3><i class="fas fa-chart-area"></i> Visualizations</h3>
+        <div class="graph-row">
+          <img class="graph" src="data:image/png;base64,${data.graphs.sequence}" alt="Sequence Graph">
+          <img class="graph" src="data:image/png;base64,${data.graphs.scatter}" alt="Scatter Graph">
+        </div>
+      </div>
+    `;
+    out.style.display='block';
+  } catch(err){
+    load.style.display='none';
+    out.style.display='block';
+    out.innerHTML=`<div class="status bad"><i class="fas fa-bug"></i> Error: ${err.message}</div>`;
+  }
+});
+
+// Auto-run once on page load for convenience
+window.addEventListener('DOMContentLoaded', () => {
+  $("#run").click();
+});
+</script>
+</body>
+</html> -->
