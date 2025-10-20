@@ -1,5 +1,5 @@
-from flask import Flask, render_template, request, jsonify
-import math
+from flask import Flask, render_template, jsonify
+import math, random
 import matplotlib
 matplotlib.use('Agg')  # headless backend for server-side rendering
 import matplotlib.pyplot as plt
@@ -44,8 +44,10 @@ app = Flask(__name__)
 
 def compute_autocorr(sequence, alpha, i, m):
     """
-    Returns a dict with all intermediate and final values,
-    following the exact manual steps in your notes.
+    Compute the autocorrelation test exactly like the manual method:
+    - Build pairs (R_{i+km}, R_{i+(k+1)m})
+    - Sum products, estimate rho_hat, sigma, Z0
+    - Return rows, equations (as strings), and graphs
     """
     seq = [float(x) for x in sequence]
     N = len(seq)
@@ -54,19 +56,18 @@ def compute_autocorr(sequence, alpha, i, m):
     if N < 2:
         raise ValueError("Provide at least two numbers in the series.")
 
-    # Step 1: Compute M  (largest integer with i + (M+1)m <= N)
+    # Largest integer M with i + (M+1)m <= N  => M = floor((N - i)/m) - 1
     M = math.floor((N - i) / m) - 1
     if M < 0:
-        raise ValueError("Parameters produce negative M. Increase N or adjust i / m / i.")
+        raise ValueError("Parameters produce negative M. Increase N or adjust i/m.")
 
-    # Step 2: Build pairs and products
     rows = []
     sum_prod = 0.0
     Ri_vals = []
     Rim_vals = []
     for k in range(M + 1):
-        a = i + k*m           # 1-based index
-        b = i + (k+1)*m       # 1-based index
+        a = i + k*m           # 1-based
+        b = i + (k+1)*m       # 1-based
         Ra = seq[a-1]
         Rb = seq[b-1]
         prod = Ra * Rb
@@ -80,13 +81,8 @@ def compute_autocorr(sequence, alpha, i, m):
         Ri_vals.append(Ra)
         Rim_vals.append(Rb)
 
-    # Step 3: rho_hat
     rho_hat = (sum_prod / (M + 1)) - 0.25
-
-    # Step 4: sigma (Schmidt–Taylor from your notes)
     sd = math.sqrt(13*M + 7) / (12*(M + 1))
-
-    # Step 5: Z0 and critical Z
     Z0 = rho_hat / sd
     Zcrit = zcrit_two_tailed(alpha)
     independent = abs(Z0) <= Zcrit
@@ -126,6 +122,7 @@ def compute_autocorr(sequence, alpha, i, m):
 
     return {
         "N": N, "i": i, "m": m, "M": M,
+        "alpha": alpha,
         "sum_prod": sum_prod,
         "rho_hat": rho_hat,
         "sd": sd,
@@ -134,6 +131,7 @@ def compute_autocorr(sequence, alpha, i, m):
         "independent": bool(independent),
         "decision": decision,
         "rows": rows,
+        "sequence": seq,  # include the generated numbers
         "eq": {
             "m_eq": m_eq,
             "rho_eq": rho_eq,
@@ -148,6 +146,26 @@ def compute_autocorr(sequence, alpha, i, m):
         }
     }
 
+# @app.route('/')
+# def index():
+#     return render_template('index.html')
+#     @app.route('/autocorrelation', methods=['POST'])
+# def autocorrelation():
+#     try:
+#         # Auto-generate random values for parameters instead of fixed
+#         alpha = random.choice([0.01, 0.05, 0.10])   # common significance levels
+#         i = random.randint(1, 8)                    # random start index
+#         m = random.randint(2, 8)                    # random lag
+#         N = random.randint(30, 80)                  # random sequence length
+
+#         seq = [round(random.random(), 2) for _ in range(N)]
+#         result = compute_autocorr(seq, alpha, i, m)
+
+#         return jsonify(result)
+
+#     except Exception as e:
+#         print("Error:", e)
+#         return jsonify({"error": str(e)}), 400
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -155,38 +173,47 @@ def index():
 @app.route('/autocorrelation', methods=['POST'])
 def autocorrelation():
     try:
-        data = request.json
-        seq = [float(x) for x in data.get('sequence', [])]
-        alpha = float(data.get('alpha', 0.05))
-        i = int(data.get('i', 5))
-        m = int(data.get('m', 5))
+        # Auto-generate random values for parameters instead of fixed
+        alpha = random.choice([0.01, 0.05, 0.10])   # common significance levels
+        i = random.randint(1, 8)                    # random start index
+        m = random.randint(2, 8)                    # random lag
+        N = random.randint(30, 80)                  # random sequence length
 
+        seq = [round(random.random(), 2) for _ in range(N)]
         result = compute_autocorr(seq, alpha, i, m)
+
         return jsonify(result)
+
     except Exception as e:
         print("Error:", e)
         return jsonify({"error": str(e)}), 400
 
-# Optional: quick self-test route (uses the 50-number example)
-@app.route('/selftest')
-def selftest():
-    seq = [
-        0.63,0.28,0.30,0.42,0.97,0.05,0.71,0.63,0.17,0.86,
-        0.61,0.19,0.94,0.64,0.84,0.54,0.56,0.57,0.09,0.99,
-        0.01,0.10,0.69,0.38,0.93,0.85,0.68,0.14,0.18,0.84,
-        0.19,0.71,0.44,0.72,0.95,0.28,0.96,0.51,0.50,0.89,
-        0.66,0.31,0.50,0.33,0.89,0.54,0.73,0.76,0.62,0.92
-    ]
-    out = compute_autocorr(seq, 0.05, 5, 5)
-    # Return a quick summary
-    return {
-        "M": out["M"],
-        "rho_hat": round(out["rho_hat"], 6),
-        "sd": round(out["sd"], 6),
-        "Z0": round(out["Z0"], 6),
-        "Zcrit": round(out["Zcrit"], 4),
-        "decision": out["decision"]
-    }
+
+
+# @app.route('/autocorrelation', methods=['POST'])
+# def autocorrelation():
+#     try:
+#         # Auto-generate sequence & fixed params (tune as needed)
+#         # alpha = 0.05
+#         # i = 5
+#         # m = 5
+#         # N = 50
+#         # seq = [round(random.random(), 2) for _ in range(N)]
+#         # result = compute_autocorr(seq, alpha, i, m)
+#         # Auto-generate random values for parameters instead of fixed
+# alpha = random.choice([0.01, 0.05, 0.10])   # common significance levels
+# i = random.randint(1, 8)                    # random start index
+# m = random.randint(2, 8)                    # random lag
+# N = random.randint(30, 80)                  # random sequence length
+
+# seq = [round(random.random(), 2) for _ in range(N)]
+# result = compute_autocorr(seq, alpha, i, m)
+
+#         return jsonify(result)
+
+#     except Exception as e:
+#         print("Error:", e)
+#         return jsonify({"error": str(e)}), 400
 
 if __name__ == '__main__':
     app.run(debug=True)
